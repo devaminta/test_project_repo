@@ -3,52 +3,46 @@ import json
 
 def extract_toc_structure(file_path):
     pdf_document = fitz.open(file_path)
-    toc = pdf_document.get_toc()    
+    toc = pdf_document.get_toc()
     structure = {}
-    chapter = section = subsection = None
+    chapter_num = section_num = subsection_num = 0
 
     for entry in toc:
         level, title, page_num = entry
 
         if level == 1:
+            chapter_num += 1
+            section_num = subsection_num = 0
+            chapter_key = str(chapter_num)
             chapter = {
                 "title": title,
-                "sections": {},
-                "text": ""
+                "sections": {}
             }
-            structure[str(len(structure) + 1)] = chapter
+            structure[chapter_key] = chapter
 
-        elif level == 2 and chapter:
+        elif level == 2:
+            if chapter_num == 0:
+                continue
+            section_num += 1
+            subsection_num = 0
+            section_key = f"{chapter_num}.{section_num}"
             section = {
                 "title": title,
-                "subsections": {},
-                "text": ""
+                "subsections": {}
             }
-            chapter["sections"][str(len(chapter["sections"]) + 1)] = section
+            structure[str(chapter_num)]["sections"][section_key] = section
 
-        elif level == 3 and section:
+        elif level == 3:
+            if chapter_num == 0 or section_num == 0:
+                continue
+            subsection_num += 1
+            subsection_key = f"{chapter_num}.{section_num}.{subsection_num}"
             subsection = {
-                "title": title,
-                "text": ""
+                "title": title
             }
-            section["subsections"][str(len(section["subsections"]) + 1)] = subsection
-
-    for chapter_key, chapter in structure.items():
-        chapter["text"] = extract_text(pdf_document, chapter.get("start_page"), chapter.get("end_page"))
-        for section_key, section in chapter["sections"].items():
-            section["text"] = extract_text(pdf_document, section.get("start_page"), section.get("end_page"))
-            for subsection_key, subsection in section["subsections"].items():
-                subsection["text"] = extract_text(pdf_document, subsection.get("start_page"), subsection.get("end_page"))
+            structure[str(chapter_num)]["sections"][f"{chapter_num}.{section_num}"]["subsections"][subsection_key] = subsection
 
     return structure
-
-def extract_text(pdf_document, start_page, end_page):
-    text = ""
-    if start_page is not None and end_page is not None:
-        for page_num in range(start_page - 1, end_page):
-            page = pdf_document.load_page(page_num)
-            text += page.get_text()
-    return text
 
 def save_structure_to_json(structure, output_file):
     with open(output_file, 'w', encoding='utf-8') as f:
